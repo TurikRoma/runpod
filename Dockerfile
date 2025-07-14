@@ -10,4 +10,6 @@ COPY . .
 
 RUN chmod +x ./start.sh
 
-CMD ["./start.sh"]
+# CMD ["./start.sh"]
+
+CMD ["sleep", "infinity"]
