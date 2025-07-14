@@ -1,8 +1,12 @@
 #!/bin/bash
 
-# Запускаем uvicorn в фоновом режиме. Знак '&' в конце ОБЯЗАТЕЛЕН.
+# Эта команда заставит скрипт немедленно завершиться, если любая команда вернет ошибку.
+# Это очень важно для отладки.
+set -e
+
+echo "--- Starting Uvicorn Server in background ---"
 uvicorn main:app --host 0.0.0.0 --port 8000 &
 
-# Запускаем обработчик RunPod. Он будет "слушать" задания.
-# Ключ -u важен для того, чтобы логи сразу появлялись в RunPod.
+echo "--- Starting RunPod Handler in foreground ---"
+# Теперь, если python3 handler.py упадет, мы увидим ошибку благодаря 'set -e'
 python3 -u handler.py
