@@ -5,6 +5,7 @@ WORKDIR /app
 
 # Копируем файл с зависимостями в контейнер.
 COPY requirements.txt .
+ARG CACHE_BUSTER=1
 
 # Устанавливаем обновленные зависимости.
 RUN pip install --no-cache-dir -r requirements.txt
