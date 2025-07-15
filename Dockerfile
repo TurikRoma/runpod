@@ -18,13 +18,13 @@ RUN pip install --no-cache-dir "pip<24.1"
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code into image
-COPY handler.py main.py model_loader.py models.py routes.py __init__.py start.sh ./
+COPY . .
 
-# Debug: list files in /app
+# Debug: list files in /app (optional)
 RUN echo "FILES IN /app:" && ls -R /app
 
 # Make the start script executable
-RUN chmod +x ./start.sh
+RUN chmod +x start.sh
 
 # Default command
 CMD ["./start.sh"]
