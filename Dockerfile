@@ -1,17 +1,30 @@
+# Use slim Python base
 FROM python:3.10-slim
+
+# Set working directory
 WORKDIR /app
 
-# ---- до pip install: устанавливаем git и инструменты сборки ----
+# Install system packages for C-extension builds, Git, image/video libs
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
       build-essential git python3-dev libffi-dev \
       ffmpeg libgl1 libglib2.0-0 libsm6 libxrender1 libxext6 && \
     rm -rf /var/lib/apt/lists/*
 
+# Copy and install Python dependencies
 COPY requirements.txt .
+# Pin pip to <24.1 to allow legacy metadata
 RUN pip install --no-cache-dir "pip<24.1"
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+# Copy application code into image
+COPY handler.py main.py model_loader.py models.py routes.py __init__.py start.sh ./
+
+# Debug: list files in /app
+RUN echo "FILES IN /app:" && ls -R /app
+
+# Make the start script executable
 RUN chmod +x ./start.sh
+
+# Default command
 CMD ["./start.sh"]
