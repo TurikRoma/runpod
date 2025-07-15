@@ -1,41 +1,33 @@
-from pydantic import BaseModel, validator,HttpUrl
-from typing import List,Union,Optional
-import re
+# models.py
+
+from pydantic import BaseModel, HttpUrl, Field
+from typing import List, Optional
 
 class GenerateMakeupRequest(BaseModel):
-    user_photos: List[str]
-    reference_photo: str
-    
-    @validator('user_photos')
-    def validate_user_photos(cls, v):
-        if not v:
-            raise ValueError('User photos cannot be empty')
-        if len(v) > 3:
-            raise ValueError('Maximum 3 user photos allowed')
-        if len(v) < 1:
-            raise ValueError('Minimum 1 user photo required')
-        
-        # Validate URLs
-        for url in v:
-            if not re.match(r'^https?://', url):
-                raise ValueError(f'Invalid URL format: {url}')
-        
-        return v
-    
-    @validator('reference_photo')
-    def validate_reference_photo(cls, v):
-        if not v:
-            raise ValueError('Reference photo cannot be empty')
-        if not re.match(r'^https?://', v):
-            raise ValueError(f'Invalid URL format: {v}')
-        return v
-
-class DownloadResult(BaseModel):
-    url: str
-    status: str
-    error_message: Union[str, None] = None
-    image_size: Union[List[int], None] = None
+    """
+    Модель запроса, четко разделяющая фотографии по их назначению
+    в конвейере генерации изображений.
+    """
+    reference_photo_url: HttpUrl = Field(
+        ...,
+        description="URL фото для отправки в Gemini для генерации промпта."
+    )
+    structure_photo_url: HttpUrl = Field(
+        ...,
+        description="URL фото для ControlNet для извлечения позы."
+    )
+    user_id_photo_urls: List[HttpUrl] = Field(
+        ...,
+        min_items=1,
+        max_items=3,
+        description="Список URL-адресов фотографий лица для PhotoMaker."
+    )
 
 class GenerateMakeupResponse(BaseModel):
-    total_photos_received: int
-    result_image: Optional[HttpUrl] = None # <-- Изменено: теперь это одна,
+    """
+    Модель ответа, возвращающая сгенерированное изображение в формате Base64
+    и текстовый промпт, использованный для его создания.
+    """
+    message: str
+    llm_prompt: str
+    image_base64: str
