@@ -1,13 +1,12 @@
-# Use slim Python base
 FROM python:3.10-slim
 
 # Set working directory
 WORKDIR /app
 
-# Install system packages for C-extension builds, Git, image/video libs
+# Install system packages for C-extension builds, Git, Curl, image/video libs
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-      build-essential git python3-dev libffi-dev \
+      build-essential git python3-dev libffi-dev curl \
       ffmpeg libgl1 libglib2.0-0 libsm6 libxrender1 libxext6 && \
     rm -rf /var/lib/apt/lists/*
 
