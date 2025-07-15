@@ -15,20 +15,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.routes import router
 import firebase_admin
 from firebase_admin import credentials
+from model_loader import load_models
 
 # --- КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: Теперь импортируем model_loader как обычный модуль ---
 # Он должен быть в корневом каталоге проекта (рядом с main.py)
-try:
-    from model_loader import load_models
-    print("Successfully imported model_loader.") # <-- Для отладки
-except ImportError as e:
-    print(f"CRITICAL ERROR: Failed to import model_loader. Error: {e}")
-    # Вызываем SystemExit, чтобы контейнер явно упал и показал эту ошибку
-    sys.exit(1)
-# -----------------------------------------------------------------------------
-
-# --- Инициализация Firebase Admin SDK из секрета RunPod ---
-# ... (ваш код инициализации Firebase без изменений) ...
 if 'FIREBASE_CREDS_JSON' in os.environ:
     try:
         creds_json_str = os.environ['FIREBASE_CREDS_JSON']
@@ -39,8 +29,7 @@ if 'FIREBASE_CREDS_JSON' in os.environ:
         print("Firebase Admin SDK initialized successfully!")
     except Exception as e:
         print(f"ERROR: Failed to initialize Firebase Admin SDK: {e}")
-        # Вызываем SystemExit, чтобы контейнер явно упал и показал эту ошибку
-        sys.exit(1)
+        # Не выходим, чтобы увидеть другие ошибки, но для продакшна лучше sys.exit(1)
 else:
     print("WARNING: FIREBASE_CREDS_JSON secret not found. Firebase features will be disabled.")
 
@@ -54,14 +43,13 @@ app = FastAPI(
 # --- Загрузка моделей при старте приложения ---
 @app.on_event("startup")
 async def startup_event():
-    print("FastAPI Startup Event: Initializing AI models...")
+    print("FastAPI Startup Event: Initializing AI models (from pre-downloaded cache)...")
     try:
-        app.state.MODELS = load_models() # Загружаем модели и сохраняем их в состоянии приложения
+        app.state.MODELS = load_models() # Модели теперь будут загружаться быстро из кэша
         print("FastAPI Startup Event: AI models loaded successfully.")
     except Exception as e:
         print(f"CRITICAL ERROR: Failed to load AI models during startup. Error: {e}")
-        # Это приведет к падению Uvicorn, что мы и хотим для явной ошибки
-        raise # Повторно выбрасываем исключение, чтобы Uvicorn упал
+        raise # FastAPI упадет, если модели не загрузятся
 
 app.add_middleware(
     CORSMiddleware,
