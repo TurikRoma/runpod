@@ -8,15 +8,22 @@ import firebase_admin
 from firebase_admin import credentials
 
 # --- КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: Импортируем загрузчик моделей ---
-from model_loader import load_models
+# Убедитесь, что model_loader.py находится в той же директории, что и main.py
+# (то есть в корне проекта, или /app в контейнере)
+try:
+    from model_loader import load_models
+except ImportError as e:
+    print(f"CRITICAL ERROR: Failed to import model_loader. Check file existence and path. Error: {e}")
+    # Можно добавить sys.exit(1) здесь для более явного падения
+    raise
 # -----------------------------------------------------------
 
-# --- РЕШЕНИЕ ПРОБЛЕМЫ С ИМПОРТАМИ (уже было, оставляем) ---
+# --- РЕШЕНИЕ ПРОБЛЕМЫ С ИМПОРТАМИ (оставляем, не помешает) ---
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 # -----------------------------------------------------------
 
 # --- Инициализация Firebase Admin SDK из секрета RunPod ---
-# Проверяем, есть ли наш секрет в переменных окружения
+# ... (ваш код инициализации Firebase без изменений) ...
 if 'FIREBASE_CREDS_JSON' in os.environ:
     try:
         creds_json_str = os.environ['FIREBASE_CREDS_JSON']
@@ -41,8 +48,13 @@ app = FastAPI(
 @app.on_event("startup")
 async def startup_event():
     print("Запуск FastAPI: Инициализация моделей AI...")
-    app.state.MODELS = load_models() # Загружаем модели и сохраняем их в состоянии приложения
-    print("FastAPI startup complete: AI models loaded.")
+    try:
+        app.state.MODELS = load_models() # Загружаем модели и сохраняем их в состоянии приложения
+        print("FastAPI startup complete: AI models loaded.")
+    except Exception as e:
+        print(f"CRITICAL ERROR: Failed to load AI models during startup. Error: {e}")
+        # Это приведет к падению Uvicorn, что мы и хотим для явной ошибки
+        raise 
 
 app.add_middleware(
     CORSMiddleware,

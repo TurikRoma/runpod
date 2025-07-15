@@ -3,7 +3,6 @@ set -e
 
 echo "--- STARTING SCRIPT ---"
 
-# Verify Python
 echo "--- Verifying python installation ---"
 which python3
 python3 --version
@@ -11,23 +10,13 @@ python3 --version
 echo "--- Verifying Uvicorn (module) installation ---"
 python3 -m uvicorn --version
 
-# Start Uvicorn in background, logging to file
+# Start Uvicorn in background, redirecting its logs directly to stdout/stderr
+# --log-level debug - полезно для отладки
 echo "--- Starting Uvicorn Server in background ---"
-python3 -m uvicorn main:app --host 0.0.0.0 --port 8000 --log-level debug > uvicorn.log 2>&1 &
+python3 -m uvicorn main:app --host 0.0.0.0 --port 8000 --log-level debug & 
 
-# Wait until Uvicorn responds
-echo "⏳ Waiting for Uvicorn to initialize…"
-for i in {1..10}; do
-  if curl -s http://127.0.0.1:8000/ > /dev/null; then
-    echo "✅ Uvicorn is up!"
-    break
-  fi
-  printf "."
-  sleep 1
-done
-
-echo "📄 UVicorn startup log (first 50 lines):"
-head -n 50 uvicorn.log || true
+# --- Убираем цикл ожидания Uvicorn'а ---
+# Handler.py будет сам пытаться подключиться и вернет ошибку, если Uvicorn не готов
 
 # Run the RunPod handler in foreground
 echo "--- Starting RunPod Handler in foreground ---"
