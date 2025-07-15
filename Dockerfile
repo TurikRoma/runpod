@@ -13,14 +13,15 @@ RUN apt-get update && \
 # Copy and install Python dependencies
 COPY requirements.txt .
 # Pin pip to <24.1 to allow legacy metadata
-RUN pip install --no-cache-dir "pip<24.1" # Эта строка может быть причиной проблем
+# RUN pip install --no-cache-dir "pip<24.1" # Оставляем закомментированным, как обсуждали
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code into image
 COPY . .
 
 # Debug: list files in /app (optional)
-RUN echo "FILES IN /app:" && ls -R /app"
+# Исправленная строка: убрана лишняя кавычка в конце
+RUN echo "FILES IN /app:" && ls -R /app 
 
 # Make the start script executable
 RUN chmod +x start.sh
