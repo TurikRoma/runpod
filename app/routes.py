@@ -6,18 +6,36 @@ import base64
 import io
 import requests
 import google.generativeai as genai
+import os
 
 from fastapi import APIRouter, HTTPException, Depends, Request
 from pydantic import HttpUrl
 from PIL import Image
+from firebase_admin import auth
 
 from .models import GenerateMakeupRequest, GenerateMakeupResponse
 
-API_KEY = "YOUR_GEMINI_API_KEY" 
-
-genai.configure(api_key=API_KEY)
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") # Получаем из RunPod Secret
+if not GEMINI_API_KEY:
+    print("ERROR: GEMINI_API_KEY environment variable not set!")
+    # В продакшне здесь можно выбросить исключение или не запускать сервис
+    # Для отладки пока просто выводим сообщение
+    
+genai.configure(api_key=GEMINI_API_KEY) # Конфигурируем Gemini
 
 router = APIRouter()
+
+async def get_current_user(request: Request):
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or not auth_header.startswith('Bearer '):
+        raise HTTPException(status_code=401, detail='Missing token')
+    id_token = auth_header.split(' ')[1]
+    try:
+        decoded_token = auth.verify_id_token(id_token)
+        return decoded_token['uid']
+    except Exception as e:
+        print(f"Firebase token verification failed: {e}")
+        raise HTTPException(status_code=401, detail=f'Invalid token: {e}')
 
 def download_image(url: HttpUrl) -> Image.Image:
     """Скачивает изображение по URL и возвращает объект PIL Image."""
@@ -47,7 +65,7 @@ Do not add any other text, explanations, or formatting. Just return the single p
         raise HTTPException(status_code=500, detail=f"Ошибка при обращении к LLM API: {e}")
 
 @router.post("/generate-makeup", response_model=GenerateMakeupResponse, summary="Сгенерировать новое изображение")
-async def generate_makeup(request: Request, data: GenerateMakeupRequest): # Убрана зависимость от Firebase для простоты
+async def generate_makeup(request: Request, data: GenerateMakeupRequest, user_id: str = Depends(get_current_user)):
     """
     Полный конвейер генерации изображений:
     1. Получает промпт от Gemini на основе референсного фото.

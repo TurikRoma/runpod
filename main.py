@@ -1,14 +1,19 @@
 import sys
 import os
-sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
-
-import os
 import json
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routes import router
 import firebase_admin
 from firebase_admin import credentials
+
+# --- КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: Импортируем загрузчик моделей ---
+from model_loader import load_models
+# -----------------------------------------------------------
+
+# --- РЕШЕНИЕ ПРОБЛЕМЫ С ИМПОРТАМИ (уже было, оставляем) ---
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+# -----------------------------------------------------------
 
 # --- Инициализация Firebase Admin SDK из секрета RunPod ---
 # Проверяем, есть ли наш секрет в переменных окружения
@@ -31,6 +36,13 @@ app = FastAPI(
     description="Backend API for AI makeup generation",
     version="1.0.0"
 )
+
+# --- КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: Загрузка моделей при старте приложения ---
+@app.on_event("startup")
+async def startup_event():
+    print("Запуск FastAPI: Инициализация моделей AI...")
+    app.state.MODELS = load_models() # Загружаем модели и сохраняем их в состоянии приложения
+    print("FastAPI startup complete: AI models loaded.")
 
 app.add_middleware(
     CORSMiddleware,
