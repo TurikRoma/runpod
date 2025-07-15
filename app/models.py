@@ -1,5 +1,5 @@
-from pydantic import BaseModel, validator
-from typing import List
+from pydantic import BaseModel, validator,HttpUrl
+from typing import List,Union
 import re
 
 class GenerateMakeupRequest(BaseModel):
@@ -30,8 +30,13 @@ class GenerateMakeupRequest(BaseModel):
             raise ValueError(f'Invalid URL format: {v}')
         return v
 
+class DownloadResult(BaseModel):
+    url: str # Оригинальный URL
+    status: str # 'success' или 'error'
+    error_message: Union[str, None] = None # Сообщение об ошибке, если статус 'error'
+    image_size: Union[List[int], None] = None # Размеры изображения [width, height], если успешно
+
 class GenerateMakeupResponse(BaseModel):
-    total_photos: int
-    user_photos: List[str]
-    reference_photo: str
-    message: str 
+    total_photos_received: int # Общее количество URL, которые были получены
+    processed_results: List[DownloadResult] # Результаты обработки каждого URL
+    message: str # Общее сообщение о статусе
