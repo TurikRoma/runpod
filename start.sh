@@ -10,15 +10,15 @@ python3 --version
 echo "--- Verifying Uvicorn (module) installation ---"
 python3 -m uvicorn --version
 
-# Start Uvicorn in background, redirecting its logs directly to stdout/stderr
+# Start Uvicorn in background. Its logs will go directly to stdout/stderr of the container.
 # --log-level debug - полезно для отладки
 echo "--- Starting Uvicorn Server in background ---"
+# Запускаем Uvicorn, его логи пойдут в основной поток.
+# Если Uvicorn падает, мы увидим его ошибку.
 python3 -m uvicorn main:app --host 0.0.0.0 --port 8000 --log-level debug & 
 
-# --- Убираем цикл ожидания Uvicorn'а ---
-# Handler.py будет сам пытаться подключиться и вернет ошибку, если Uvicorn не готов
-
-# Run the RunPod handler in foreground
+# Run the RunPod handler in foreground.
+# Это основной процесс контейнера. Если он завершится, контейнер остановится.
 echo "--- Starting RunPod Handler in foreground ---"
 python3 -u handler.py 2>&1
 EXIT_CODE=$?
