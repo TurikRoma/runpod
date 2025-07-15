@@ -20,3 +20,4 @@ torch
 numpy
 torchvision
 google.generativeai
+git+https://github.com/TencentARC/PhotoMaker.git
