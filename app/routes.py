@@ -11,18 +11,13 @@ from fastapi import APIRouter, HTTPException, Depends, Request
 from pydantic import HttpUrl
 from PIL import Image
 
-# Локальные импорты обновленных моделей
 from .models import GenerateMakeupRequest, GenerateMakeupResponse
 
-# --- КОНФИГУРАЦИЯ API (предполагается, что она загружается из окружения) ---
-# УБЕДИТЕСЬ, ЧТО API_KEY ЗАГРУЖАЕТСЯ БЕЗОПАСНО, А НЕ ЖЕСТКО ЗАКОДИРОВАН
-# Например: API_KEY = os.getenv("GEMINI_API_KEY")
-API_KEY = "YOUR_GEMINI_API_KEY" # Замените на ваш ключ или метод загрузки
+API_KEY = "YOUR_GEMINI_API_KEY" 
+
 genai.configure(api_key=API_KEY)
 
 router = APIRouter()
-
-# --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ (перенесены из main.py) ---
 
 def download_image(url: HttpUrl) -> Image.Image:
     """Скачивает изображение по URL и возвращает объект PIL Image."""
@@ -51,9 +46,6 @@ Do not add any other text, explanations, or formatting. Just return the single p
         print(f"Произошла ошибка во время вызова Gemini API: {e}")
         raise HTTPException(status_code=500, detail=f"Ошибка при обращении к LLM API: {e}")
 
-
-# --- ОСНОВНОЙ ЭНДПОИНТ API ---
-
 @router.post("/generate-makeup", response_model=GenerateMakeupResponse, summary="Сгенерировать новое изображение")
 async def generate_makeup(request: Request, data: GenerateMakeupRequest): # Убрана зависимость от Firebase для простоты
     """
@@ -72,7 +64,6 @@ async def generate_makeup(request: Request, data: GenerateMakeupRequest): # Уб
     try:
         reference_image = download_image(data.reference_photo_url)
         prompt = await get_prompt_from_llm(reference_image)
-        print(f"✅ Промпт от LLM получен: '{prompt}'")
     except HTTPException as e:
         raise e
 
@@ -117,7 +108,7 @@ async def generate_makeup(request: Request, data: GenerateMakeupRequest): # Уб
         start_merge_step=1,
         guidance_scale=7,
     ).images
-    print("✅ Генерация завершена.")
+    print("Генерация завершена.")
 
     # --- Шаг 4: Кодирование результата и возврат ---
     generated_image = images[0]
