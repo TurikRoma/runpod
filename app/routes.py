@@ -6,6 +6,7 @@ from firebase_admin import auth
 import requests
 from PIL import Image
 from io import BytesIO
+import random
 # ---------------------------------------------------------------
 
 router = APIRouter()
@@ -77,33 +78,40 @@ def download_and_process_image(url: str) -> DownloadResult:
 async def generate_makeup(request: GenerateMakeupRequest, user_id: str = Depends(get_current_user)):
     """
     Генерирует макияж на основе фотографий пользователя и референсного фото.
-    Скачивает каждое изображение по URL и возвращает детальный отчет об обработке.
+    Скачивает каждое изображение по URL и возвращает общее количество и один случайный URL.
     """
     print(f"Запрос /generate-makeup от пользователя: {user_id}")
     
-    # Собираем все URL в один список для удобства обработки
     all_photos_to_process = []
-    all_photos_to_process.extend(request.user_photos) # Добавляем фото пользователя
-    all_photos_to_process.append(request.reference_photo) # Добавляем референсное фото
+    all_photos_to_process.extend(request.user_photos)
+    all_photos_to_process.append(request.reference_photo)
 
-    processed_results_list = []
+    processed_urls_only = [] # Для сбора только URL успешно обработанных фото
+    
     for url_string in all_photos_to_process:
         print(f"Attempting to download and process: {url_string}")
-        # Вызываем вспомогательную функцию для каждого URL
-        result = download_and_process_image(url_string)
-        processed_results_list.append(result)
+        result = download_and_process_image(url_string) # Функция остается, но результат используется иначе
         
         if result.status == "success":
             print(f"Successfully processed {url_string}. Size: {result.image_size}")
+            processed_urls_only.append(result.url) # Собираем только URL успешно скачанных фото
         else:
             print(f"Failed to process {url_string}. Error: {result.error_message}")
 
-    total_photos_count = len(processed_results_list)
+    total_photos_count = len(all_photos_to_process) # Количество полученных URL
+    
+    # --- НОВАЯ ЛОГИКА: Выбираем случайный URL из успешно обработанных ---
+    selected_result_image_url = None
+    if processed_urls_only: # Если есть хотя бы одна успешно обработанная фотография
+        selected_result_image_url = random.choice(processed_urls_only)
+        print(f"Randomly selected final image URL: {selected_result_image_url}")
+    else:
+        print("No photos were successfully processed, cannot select a random one.")
+        # selected_result_image_url останется None, как и определено в модели Optional[HttpUrl]
 
-    # Формируем и возвращаем ответ, используя обновленную модель GenerateMakeupResponse
+    # Формируем и возвращаем ответ, используя ОБНОВЛЕННУЮ модель GenerateMakeupResponse
     response = GenerateMakeupResponse(
-        total_photos_received=total_photos_count,
-        processed_results=processed_results_list,
-        message=f"Attempted to process {total_photos_count} URLs."
+        total_photos_received=total_photos_count, # Общее количество полученных URL
+        result_image=selected_result_image_url,    # Случайный URL или None
     )
     return response

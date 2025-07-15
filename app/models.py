@@ -1,5 +1,5 @@
 from pydantic import BaseModel, validator,HttpUrl
-from typing import List,Union
+from typing import List,Union,Optional
 import re
 
 class GenerateMakeupRequest(BaseModel):
@@ -31,12 +31,11 @@ class GenerateMakeupRequest(BaseModel):
         return v
 
 class DownloadResult(BaseModel):
-    url: str # Оригинальный URL
-    status: str # 'success' или 'error'
-    error_message: Union[str, None] = None # Сообщение об ошибке, если статус 'error'
-    image_size: Union[List[int], None] = None # Размеры изображения [width, height], если успешно
+    url: str
+    status: str
+    error_message: Union[str, None] = None
+    image_size: Union[List[int], None] = None
 
 class GenerateMakeupResponse(BaseModel):
-    total_photos_received: int # Общее количество URL, которые были получены
-    processed_results: List[DownloadResult] # Результаты обработки каждого URL
-    message: str # Общее сообщение о статусе
+    total_photos_received: int
+    result_image: Optional[HttpUrl] = None # <-- Изменено: теперь это одна,
