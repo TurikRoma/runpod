@@ -1,16 +1,22 @@
 #!/bin/bash
+set -e
+
+echo "--- STARTING SCRIPT ---"
+
+echo "--- Verifying python installation ---"
+which python3
+python3 --version
+
+echo "--- Verifying uvicorn installation ---"
+which uvicorn
 
 echo "--- Starting Uvicorn Server in background ---"
 uvicorn main:app --host 0.0.0.0 --port 8000 &
 
-echo "--- Starting RunPod Handler ---"
-# Запускаем handler и ждем его завершения
+echo "--- Starting RunPod Handler in foreground ---"
 python3 -u handler.py 2>&1
 
-# Получаем код завершения последней команды
 EXIT_CODE=$?
-
-# Проверяем, был ли код завершения НЕ нулевым (т.е. была ли ошибка)
 if [ $EXIT_CODE -ne 0 ]; then
     echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
     echo "PYTHON HANDLER FAILED WITH EXIT CODE: $EXIT_CODE"
