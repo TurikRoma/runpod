@@ -14,12 +14,11 @@ RUN apt-get update && \
 # Update pip and install build tools
 RUN pip install --upgrade pip setuptools wheel
 
-# Install huggingface_hub explicitly
-RUN pip install --no-cache-dir huggingface_hub
-
-# --- Ключевое изменение: УДАЛЯЕМ проблемную строку 404 ---
-# Создаем папки для кэша Hugging Face и InsightFace
-RUN mkdir -p /root/.cache/huggingface/hub \
+# --- КЭШИРОВАНИЕ ---
+# Создаем папки для кэша Hugging Face и InsightFace.
+# Используем ENV для единообразия путей.
+ENV HF_HOME /root/.cache/huggingface
+RUN mkdir -p $HF_HOME/hub \
              /root/.insightface/models
 
 # Предзагрузка модели insightface (buffalo_l)
@@ -29,36 +28,28 @@ RUN echo "Downloading insightface buffalo_l model..." && \
     unzip /root/.insightface/models/buffalo_l.zip -d /root/.insightface/models && \
     rm /root/.insightface/models/buffalo_l.zip
 
-# Загружаем ОСТАЛЬНЫЕ модели Hugging Face по отдельности, которые точно существуют
-ENV HF_HOME /root/.cache/huggingface 
-RUN python3 -c "from huggingface_hub import hf_hub_download; print('Downloading controlnet-openpose-sdxl-1.0 pytorch_model.bin'); hf_hub_download(repo_id='thibaud/controlnet-openpose-sdxl-1.0', filename='pytorch_model.bin', cache_dir='/root/.cache/huggingface/hub')"
-RUN python3 -c "from huggingface_hub import hf_hub_download; print('Downloading RealVisXL_V4.0 pytorch_model.bin'); hf_hub_download(repo_id='SG161222/RealVisXL_V4.0', filename='pytorch_model.bin', cache_dir='/root/.cache/huggingface/hub')"
-RUN python3 -c "from huggingface_hub import hf_hub_download; print('Downloading photomaker-v2.bin'); hf_hub_download(repo_id='TencentARC/PhotoMaker-V2', filename='photomaker-v2.bin', repo_type='model', cache_dir='/root/.cache/huggingface/hub')"
-# ------------------------------------------------------------------------------------------------------------------------
-
-# Copy PhotoMaker repo
-RUN git clone https://github.com/TencentARC/PhotoMaker.git PhotoMaker-repo
-
-# Copy requirements.txt AFTER cloning PhotoMaker
+# --- УСТАНОВКА PYTHON ЗАВИСИМОСТЕЙ ---
+# Копируем requirements.txt и устанавливаем зависимости ДО кода приложения для лучшего кэширования слоев
 COPY requirements.txt .
-
-# --- Установка остальных Python-зависимостей ---
-ARG CACHE_BUSTER=1 
 # Добавляем controlnet_aux[full] для установки всех зависимостей OpenposeDetector
 RUN pip install --no-cache-dir -r requirements.txt \
-    ./PhotoMaker-repo \
-    --index-url https://download.pytorch.org/whl/cu118 \
     opencv-python-headless \
-    controlnet_aux[full] # <-- КЛЮЧЕВОЕ ДОБАВЛЕНИЕ
+    controlnet_aux[full]
 
-# Copy application code into image
+# --- ПРЕДЗАГРУЗКА МОДЕЛЕЙ HUGGING FACE ---
+# Копируем скрипт для предзагрузки и запускаем его.
+# Это заменяет небезопасные команды hf_hub_download для отдельных файлов.
+COPY pre_download_models.py .
+RUN python3 pre_download_models.py
+
+# --- КОПИРОВАНИЕ КОДА ПРИЛОЖЕНИЯ ---
 COPY . .
 
-# Debug: list files in /app (optional)
-RUN echo "FILES IN /app:" && ls -R /app
+# Проверка, что все скопировалось (опционально)
+RUN ls -R /app
 
-# Make the start script executable
+# Делаем скрипт запуска исполняемым
 RUN chmod +x start.sh
 
-# Default command
+# Команда по умолчанию
 CMD ["./start.sh"]
