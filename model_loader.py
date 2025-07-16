@@ -1,7 +1,6 @@
-
 import os
 import sys
-
+import time
 from pathlib import Path
 from PIL import Image
 
@@ -22,7 +21,8 @@ def load_models(download_only=False):
     - В обычном режиме (download_only=False): загружает модели в память/VRAM.
     - В режиме скачивания (download_only=True): только скачивает файлы в кэш, не загружая их в память.
     """
-    print("Начало загрузки/скачивания моделей...")
+    print(f"--- [model_loader] STARTING load_models(download_only={download_only}) ---")
+    start_time = time.time()
 
     # --- 1. Определение "ссылок" на модели ---
     photomaker_repo_id = "TencentARC/PhotoMaker-V2"
@@ -32,83 +32,86 @@ def load_models(download_only=False):
     
     # --- 2. Создание папки для хранения кэша ---
     LOCAL_CACHE_DIR = "./models_cache"
-    print(f"Создание или проверка папки для кэша: {os.path.abspath(LOCAL_CACHE_DIR)}")
+    print(f"--- [model_loader] Cache directory: {os.path.abspath(LOCAL_CACHE_DIR)}")
     os.makedirs(LOCAL_CACHE_DIR, exist_ok=True)
 
     # --- Определение устройства и типа данных ---
     if download_only:
         device = "cpu"
-        torch_dtype = torch.float32  # Для скачивания не важен тип, но float32 самый безопасный
-        print("[DOWNLOAD-ONLY MODE] Устройство: cpu, Тип: float32.")
+        torch_dtype = torch.float32
+        print(f"--- [model_loader] DOWNLOAD-ONLY MODE. Device: {device}, DType: {torch_dtype}")
     else:
         device = "cuda" if torch.cuda.is_available() else "cpu"
         torch_dtype = torch.bfloat16 if torch.cuda.is_available() and torch.cuda.is_bf16_supported() else torch.float16
-        print(f"Используемое устройство: {device}, Тип: {torch_dtype}")
+        print(f"--- [model_loader] RUNTIME MODE. Device: {device}, DType: {torch_dtype}")
     
     # --- 3. Загрузка/скачивание компонентов ---
 
-    # FaceAnalysis
-    # В режиме скачивания достаточно просто создать объект, он сам скачает что нужно при первом вызове.
-    # Но для надежности вызовем prepare с CPU провайдером.
-    print("Загрузка/скачивание FaceAnalysis...")
+    print("\n--- [model_loader] Step 1/5: Loading FaceAnalysis...")
     providers = ['CPUExecutionProvider'] if download_only else ['CUDAExecutionProvider', 'CPUExecutionProvider']
     face_detector = FaceAnalysis2(providers=providers, allowed_modules=['detection', 'recognition'])
     face_detector.prepare(ctx_id=0, det_size=(640, 640))
+    print("--- [model_loader] FaceAnalysis loaded. OK.")
     
-    # PhotoMaker weights
-    print("Загрузка/скачивание PhotoMaker v2 weights...")
+    print("\n--- [model_loader] Step 2/5: Loading PhotoMaker weights...")
     photomaker_path = hf_hub_download(
         repo_id=photomaker_repo_id,
         filename="photomaker-v2.bin",
         repo_type="model",
         cache_dir=LOCAL_CACHE_DIR
     )
+    print("--- [model_loader] PhotoMaker weights loaded. OK.")
 
-    # OpenPose
-    print("Загрузка/скачивание OpenPose detector...")
+    print("\n--- [model_loader] Step 3/5: Loading OpenPose detector...")
     openpose = OpenposeDetector.from_pretrained(openpose_repo_id, cache_dir=LOCAL_CACHE_DIR)
+    print("--- [model_loader] OpenPose detector loaded. OK.")
 
-    # ControlNet
-    print("Загрузка/скачивание ControlNet model...")
+    print("\n--- [model_loader] Step 4/5: Loading ControlNet model...")
     controlnet_pose = ControlNetModel.from_pretrained(
         controlnet_repo_id,
         torch_dtype=torch_dtype,
         cache_dir=LOCAL_CACHE_DIR
     )
+    print("--- [model_loader] ControlNet model loaded from disk. OK.")
     if not download_only:
+        print("--- [model_loader] Moving ControlNet to device...")
         controlnet_pose.to(device)
+        print("--- [model_loader] ControlNet moved to device. OK.")
 
-    # Base Model Pipeline
-    print("Загрузка/скачивание основного пайплайна Stable Diffusion...")
+    print("\n--- [model_loader] Step 5/5: Loading Base Pipeline (this is the heaviest)...")
     pipe = PhotoMakerStableDiffusionXLPipeline.from_pretrained(
         base_model_repo_id,
-        # В режиме скачивания мы не передаем controlnet, чтобы не создавать лишних объектов
         controlnet=controlnet_pose if not download_only else None,
         torch_dtype=torch_dtype,
         cache_dir=LOCAL_CACHE_DIR
     )
+    print("--- [model_loader] Base Pipeline loaded from disk. OK.")
 
     if download_only:
-        print("Все модели успешно СКАЧАНЫ в кэш.")
-        return None # В режиме скачивания ничего не возвращаем
+        print(f"--- [model_loader] DOWNLOAD-ONLY finished in {time.time() - start_time:.2f}s. ---")
+        return None
 
     # --- Сборка пайплайна для рабочего режима ---
-    print("Сборка и настройка рабочего пайплайна...")
-    pipe.controlnet = controlnet_pose # Явно присваиваем controlnet
+    print("\n--- [model_loader] Finalizing pipeline setup...")
+    print("--- [model_loader] Attaching ControlNet...")
+    pipe.controlnet = controlnet_pose
+    print("--- [model_loader] Moving pipeline to device...")
     pipe = pipe.to(device)
-
+    print("--- [model_loader] Loading PhotoMaker adapter...")
     pipe.load_photomaker_adapter(
         os.path.dirname(photomaker_path),
         subfolder="",
         weight_name=os.path.basename(photomaker_path),
         trigger_word="img"
     )
-
+    print("--- [model_loader] Fusing LoRA...")
     pipe.fuse_lora()
+    print("--- [model_loader] Setting scheduler...")
     pipe.scheduler = EulerDiscreteScheduler.from_config(pipe.scheduler.config)
-    pipe.enable_model_cpu_offload() # Важно для экономии VRAM
+    print("--- [model_loader] Enabling CPU offload...")
+    pipe.enable_model_cpu_offload()
     
-    print("Модели успешно загружены и готовы к работе!")
+    print(f"--- [model_loader] ALL MODELS LOADED SUCCESSFULLY in {time.time() - start_time:.2f}s. ---")
 
     return {
         "pipe": pipe,

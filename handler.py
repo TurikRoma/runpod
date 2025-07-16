@@ -10,15 +10,20 @@ def wait_for_server():
     Ждет, пока локальный FastAPI сервер не станет доступным.
     """
     print("Waiting for local server to be ready...")
+    # Увеличиваем таймаут до 240 секунд (4 минуты)
+    # Это должно быть достаточно для загрузки моделей с диска
     start_time = time.time()
-    while time.time() - start_time < 60: # Ждем максимум 60 секунд
+    while time.time() - start_time < 240: # <--- УВЕЛИЧЕНО
         try:
-            requests.get(f"{LOCAL_URL}/", timeout=1)
-            print("Local server is ready!")
+            # Используем корневой эндпоинт FastAPI, который не требует моделей
+            requests.get(f"{LOCAL_URL}/", timeout=1) 
+            print("Local server is READY!")
             return True
         except requests.ConnectionError:
-            time.sleep(1) # Ждем 1 секунду перед следующей попыткой
-    print("Local server did not start in time.")
+            print(f"Server not ready yet, waiting... (elapsed: {int(time.time() - start_time)}s)")
+            time.sleep(2) # Проверяем каждые 2 секунды
+    
+    print("CRITICAL: Local server did not start in 240 seconds.")
     return False
 
 
